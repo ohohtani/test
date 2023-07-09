@@ -1,6 +1,4 @@
 # 헷갈릴까봐 주석을 달아보았어요. 참고하세요
-# 이거 색깔 구분 어케하노 십
-
 import os    # 파일 디렉토리 관련
 import cv2  
 import pandas as pd
