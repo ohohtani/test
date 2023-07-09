@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader    # 사용자 정의 데이터
 from torchvision import transforms   # 이미지 전처리를 편리하게 수행 가능
 
 from tqdm import tqdm    # 진행상황을 시각화 해준다
-import albumentations as A
+import albumentations as A 
 from albumentations.pytorch import ToTensorV2
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
