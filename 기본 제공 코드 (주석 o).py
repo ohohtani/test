@@ -46,34 +46,41 @@ def rle_encode(mask):  # 그니까 인코딩 정의에 의해서 인자는 그�
 
 
 
-class SatelliteDataset(Dataset):
-    def __init__(self, csv_file, transform=None, infer=False):
+
+
+class SatelliteDataset(Dataset):     # PyTorch에서 제공하는 Dataset 클래스를 상속받는 클래스 SatelliteDataset 이다. Dataset이란 놈은 데이터셋을 표현하고 로드하는 기능을 제공한다.
+    def __init__(self, csv_file, transform=None, infer=False):    # init - 알다시피 초기화. transform은 전처리, infer는 추론(학습)이다. 예측 등에 사용 된다.
         self.data = pd.read_csv(csv_file)
         self.transform = transform
         self.infer = infer
 
-    def __len__(self):
-        return len(self.data)
+    def __len__(self):   # 데이터셋의 샘플 개수를 반환한다. so, 데이터셋의 크기를 알려주는 역할을 할 수 있는데
+        return len(self.data)  # 이를 통해 학습 과정에서 샘플 개수를 반환하여 반복 횟수를 결정하거나 배치(batch)처리 등에 활용 가능하다
 
-    def __getitem__(self, idx):
-        img_path = self.data.iloc[idx, 1]
-        image = cv2.imread(img_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    def __getitem__(self, idx):  # 특정 인덱스에서 샘플을 가저오는 역할
+        img_path = self.data.iloc[idx, 1]   
+        image = cv2.imread(img_path)    # 이미지 파일을 읽고
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # 색상체계를 BGR에서 RGB로 변환시킴 (희한하게 기본값이 BGR임)
         
-        if self.infer:
-            if self.transform:
-                image = self.transform(image=image)['image']
-            return image
+        if self.infer:    # infer 가 True 라면 (추론 모드 On 이라면)
+            if self.transform:   #  + transform 이 존재한다면 (전처리 모드 On 이라면)
+                image = self.transform(image=image)['image']  # image 에 전처리를 적용한다.  (따라서 추론모드(infer)와 transform이 모두 On 상태여야 전처리를 진행 + 반환함을 알 수 있다.)
+            return image  
 
-        mask_rle = self.data.iloc[idx, 2]
-        mask = rle_decode(mask_rle, (image.shape[0], image.shape[1]))
+        mask_rle = self.data.iloc[idx, 2]  # 그럼 여기는 추론모드 off 상태이다, 데이터셋에서 idx번째 행의 2번째 열에 해당하는 마스크 정보를 가져온다. 
+                                           # 액셀 파일을 확인해보니 mask_rle가 2번 인덱스 열에 있다. 그래서 그런가 보다
+        mask = rle_decode(mask_rle, (image.shape[0], image.shape[1]))    # 마스크를 디코딩한다. 그리고 이미지의 크기와 일치하도록 맞춰준다. (shape[0] = 높이, shape[1] = 너비)
 
-        if self.transform:
-            augmented = self.transform(image=image, mask=mask)
-            image = augmented['image']
-            mask = augmented['mask']
+        if self.transform:  # 전처리 모드 On 일 시 (추론 모드와 별개)
+            augmented = self.transform(image=image, mask=mask)   # 전처리의 결과를 augmented에 저장한다. 
+            image = augmented['image'] # 전처리가 적용된 image 업데이트
+            mask = augmented['mask']   # 전처리가 적용된 mask 업데이트
 
-        return image, mask
+        return image, mask   
+
+
+# 간단 요약 : SateliteDataset이라는 클래스를 정의했으며, 데이터셋을 초기화, 크기 반환, 특정 인덱스의 샘플 가져오기 등을 수행했다.
+#            따라서 100%는 아니지만 높은확률로 아직까지는 건드릴 코드가 없다. 
 
 
 transform = A.Compose(
