@@ -83,11 +83,11 @@ class SatelliteDataset(Dataset):     # PyTorch에서 제공하는 Dataset 클래
 #            따라서 100%는 아니지만 높은확률로 아직까지는 건드릴 코드가 없다. 
 
 
-transform = A.Compose(
+transform = A.Compose(                #  전처리 과정 , 아무래도 여기부터 건드려야 할 것
     [   
-        A.Resize(224, 224),
-        A.Normalize(),
-        ToTensorV2()
+        A.Resize(224, 224),           #  이미지 크기를 224 x 224 로 조정
+        A.Normalize(),                #  이미지를 정규화 (그냥 학습 및 추론을 돕는 일반적인 단계)
+        ToTensorV2()                  #  이미지를 텐서 형태로 변환 (파이토치는 이미지를 텐서로 처리하기에 이 과정은 필수)
     ]
 )
 
