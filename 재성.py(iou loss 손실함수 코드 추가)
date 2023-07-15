@@ -1,5 +1,5 @@
 실행되는지는 아직 모름.
-솔직히 이렇게 하는건지도 잘 모르겠음. 구글 찾아보면서 열심히 하고있음 ㅇㅇ 
+솔직히 이렇게 하는건지도 잘 모르겠음. 구글 찾아보면서 열심히 하고있음 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
