@@ -1,3 +1,4 @@
+실행되는지는 아직 미확
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
