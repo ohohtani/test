@@ -33,9 +33,9 @@ def rle_decode(mask_rle, shape):    # rle_decode라는 함수를 정의한다. �
     starts -= 1  # RLE 에서는 인덱스가 1부터 시작한다고 한다. 배열의 인덱스는 0부터 시작하기 때문에 배열의 모든 요소에 1을 빼준다.
     ends = starts + lengths  # 끝 위치 = 시작 위치 + 길이
     img = np.zeros(shape[0]*shape[1], dtype=np.uint8)  # 이미지 1차원 배열 생성
-    for lo, hi in zip(starts, ends):     # starts 와 ends 배열을 순회하면서 img 배열에서 해당하는 구간을 1로 설정한다.  ? 무슨 말일까
+    for lo, hi in zip(starts, ends):     # starts 와 ends 배열을 순회하면서 img 배열에서 해당하는 구간을 1로 설정(해당 run의 위치를 표시하는 것)한다.  ? 무슨 말일까 : lo, hi 는 각 run의 시작위치와 끝 위치를 나타냄
         img[lo:hi] = 1                   
-    return img.reshape(shape)            # 아무튼 img 재열을 주어진 형태(reshape)로 다시 변형하여 복원된 마스크를 반환한다.
+    return img.reshape(shape)            # 아무튼 img 배열을 주어진 형태(reshape)로 다시 변형하여 복원된 마스크를 반환한다.
 
 # RLE 인코딩 함수 , 디코딩을 했으니 인코딩을 해줘야한다. 참고로    [디코딩 = 압축된 데이터를 원래 형태로 해독, 인코딩 = 원래의 데이터를 다른 형식으로 변환]
 def rle_encode(mask):  # 그니까 인코딩 정의에 의해서 인자는 그냥 원래 데이터를 받는 거임 (아마?)
