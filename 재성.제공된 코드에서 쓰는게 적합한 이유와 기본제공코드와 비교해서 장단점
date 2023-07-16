@@ -10,6 +10,18 @@
 세그멘테이션 작업에서 마스크는 픽셀 단위로 각 픽셀이 객체에 속하는지 여부를 나타냄
 이진 마스크는 일반적으로 0과 1의 값으로 구성되며,0은 배경을 나타내고 1은 객체를 나타냄
 
+# IoU 손실 함수 정의
+class IoULoss(nn.Module):
+    def __init__(self):
+        super(IoULoss, self).__init__()
+
+    def forward(self, outputs, targets):
+        smooth = 1e-6  # 분모가 0이 되는 것을 방지하기 위한 smoothing 값
+        intersection = (outputs * targets).sum(dim=(2, 3))  # 예측과 실제 마스크의 교집합 계산
+        union = outputs.sum(dim=(2, 3)) + targets.sum(dim=(2, 3)) - intersection  # 예측과 실제 마스크의 합집합 계산
+        iou = (intersection + smooth) / (union + smooth)  # IoU 계산
+        loss = 1 - iou.mean()  # 평균 IoU를 사용하여 손실 값 계산
+        return loss
 
 IoULoss 클래스:
 outputs는 모델이 예측한 마스크 텐서이고, targets는 실제 마스크 텐서 
