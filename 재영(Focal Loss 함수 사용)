@@ -105,10 +105,12 @@ class UNet(nn.Module):
         self.dconv_down2 = double_conv(64, 128)
         self.dconv_down3 = double_conv(128, 256)
         self.dconv_down4 = double_conv(256, 512)
+        self.dconv_down5 = double_conv(512,1024)
 
         self.maxpool = nn.MaxPool2d(2)
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
 
+        self.cvonv_up4 = double_conv(1024 + 512,512)
         self.dconv_up3 = double_conv(256 + 512, 256)
         self.dconv_up2 = double_conv(128 + 256, 128)
         self.dconv_up1 = double_conv(128 + 64, 64)
@@ -125,9 +127,16 @@ class UNet(nn.Module):
         conv3 = self.dconv_down3(x)
         x = self.maxpool(conv3)   
 
-        x = self.dconv_down4(x)
+        conv4 = self.dconv_down4(x)
+        x = self.maxpool(conv4)
+
+        x = self.dconv_down5(x)
 
         x = self.upsample(x)        
+        x = torch.cat([x, conv4], dim=1)
+
+        x = self.dconv_up4(x)
+        x = self.upsample(x)
         x = torch.cat([x, conv3], dim=1)
 
         x = self.dconv_up3(x)
