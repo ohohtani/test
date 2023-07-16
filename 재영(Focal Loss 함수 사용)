@@ -185,7 +185,7 @@ class FocalLoss(nn.Module):
         
         return loss
 
-criterion = torch.nn.BCEWithLogitsLoss()
+criterion = FocalLoss(gamma=2, alpha=None)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 if __name__ == '__main__':
