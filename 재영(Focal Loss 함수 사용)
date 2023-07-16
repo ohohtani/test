@@ -9,17 +9,18 @@ But, 추가적인 #하이퍼파라미터를 조정해야 할 필요가 있다. �
 # 파라미터 : 모델 내부에 존재하는 매개변수. 학습의 대상으로 학습 알고리즘을 통해 자동적으로 학습. ex) 학생들의 성적 데이터 -> 성적의 평균,표준편차는 파라미터 // 사용자가 설정 x, 데이터로부터 자동적으로 결정되는 
 # 하이퍼파라미터 : 경험, 데이터의 특성 등에 근거해 사용자가 설정하는 값.
 """
-import os    
-import cv2  
+
+import os
+import cv2
 import pandas as pd
 import numpy as np
 
-import torch 
+import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader    
-from torchvision import transforms   
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 
-from tqdm import tqdm    
+from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
@@ -105,14 +106,14 @@ class UNet(nn.Module):
         self.dconv_down2 = double_conv(64, 128)
         self.dconv_down3 = double_conv(128, 256)
         self.dconv_down4 = double_conv(256, 512)
-        self.dconv_down5 = double_conv(512,1024)
+        self.dconv_down5 = double_conv(512, 1024)  # 추가된 부분
 
         self.maxpool = nn.MaxPool2d(2)
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
 
-        self.cvonv_up4 = double_conv(1024 + 512,512)
-        self.dconv_up3 = double_conv(256 + 512, 256)
-        self.dconv_up2 = double_conv(128 + 256, 128)
+        self.dconv_up4 = double_conv(1024 + 512, 512)
+        self.dconv_up3 = double_conv(512 + 256, 256)
+        self.dconv_up2 = double_conv(256 + 128, 128)
         self.dconv_up1 = double_conv(128 + 64, 64)
 
         self.conv_last = nn.Conv2d(64, 1, 1)
@@ -123,35 +124,36 @@ class UNet(nn.Module):
 
         conv2 = self.dconv_down2(x)
         x = self.maxpool(conv2)
-        
+
         conv3 = self.dconv_down3(x)
-        x = self.maxpool(conv3)   
+        x = self.maxpool(conv3)
 
         conv4 = self.dconv_down4(x)
         x = self.maxpool(conv4)
 
         x = self.dconv_down5(x)
 
-        x = self.upsample(x)        
+        x = self.upsample(x)
         x = torch.cat([x, conv4], dim=1)
 
-        x = self.dconv_up4(x)
+        x = self.dconv_up4(x)  # 수정된 부분
         x = self.upsample(x)
         x = torch.cat([x, conv3], dim=1)
 
         x = self.dconv_up3(x)
-        x = self.upsample(x)        
-        x = torch.cat([x, conv2], dim=1)       
+        x = self.upsample(x)
+        x = torch.cat([x, conv2], dim=1)
 
         x = self.dconv_up2(x)
-        x = self.upsample(x)        
-        x = torch.cat([x, conv1], dim=1)   
+        x = self.upsample(x)
+        x = torch.cat([x, conv1], dim=1)
 
         x = self.dconv_up1(x)
 
         out = self.conv_last(x)
 
         return out
+
 
 
 # model 초기화
@@ -183,55 +185,56 @@ class FocalLoss(nn.Module):
         
         return loss
 
-criterion = FocalLoss(gamma=2, alpha=None)
+criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 if __name__ == '__main__':
-# training loop
-for epoch in range(10):  # 10 에폭 동안 학습합니다.
-    model.train()
-    epoch_loss = 0
-    for images, masks in tqdm(dataloader):
-        images = images.float().to(device)
-        masks = masks.float().to(device)
+    # training loop
+    for epoch in range(10):  # 10 에폭 동안 학습합니다.
+        model.train()
+        epoch_loss = 0
+        for images, masks in tqdm(dataloader):
+            images = images.float().to(device)
+            masks = masks.float().to(device)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, masks.unsqueeze(1))
+            loss.backward()
+            optimizer.step()
 
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, masks.unsqueeze(1))
-        loss.backward()
-        optimizer.step()
+            epoch_loss += loss.item()
 
-        epoch_loss += loss.item()
-
-    print(f'Epoch {epoch+1}, Loss: {epoch_loss/len(dataloader)}')
-
-
-
-test_dataset = SatelliteDataset(csv_file='./test.csv', transform=transform, infer=True)
-test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
+        print(f'Epoch {epoch+1}, Loss: {epoch_loss/len(dataloader)}')
 
 
 
-with torch.no_grad():
-    model.eval()
-    result = []
-    for images in tqdm(test_dataloader):
-        images = images.float().to(device)
-        
-        outputs = model(images)
-        masks = torch.sigmoid(outputs).cpu().numpy()
-        masks = np.squeeze(masks, axis=1)
-        masks = (masks > 0.35).astype(np.uint8) # Threshold = 0.35
-        
-        for i in range(len(images)):
-            mask_rle = rle_encode(masks[i])
-            if mask_rle == '': # 예측된 건물 픽셀이 아예 없는 경우 -1
-                result.append(-1)
-            else:
-                result.append(mask_rle)
+    test_dataset = SatelliteDataset(csv_file='./test.csv', transform=transform, infer=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
 
 
-submit = pd.read_csv('./sample_submission.csv')
-submit['mask_rle'] = result
 
-submit.to_csv('./submit.csv', index=False)
+    with torch.no_grad():
+        model.eval()
+        result = []
+        for images in tqdm(test_dataloader):
+            images = images.float().to(device)
+            
+
+            outputs = model(images)
+            masks = torch.sigmoid(outputs).cpu().numpy()
+            masks = np.squeeze(masks, axis=1)
+            masks = (masks > 0.35).astype(np.uint8) # Threshold = 0.35
+            
+            for i in range(len(images)):
+                mask_rle = rle_encode(masks[i])
+                if mask_rle == '': # 예측된 건물 픽셀이 아예 없는 경우 -1
+                    result.append(-1)
+                else:
+                    result.append(mask_rle)
+
+
+    submit = pd.read_csv('./sample_submission.csv')
+    submit['mask_rle'] = result
+
+    submit.to_csv('./submit.csv', index=False)
+    
