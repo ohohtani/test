@@ -46,20 +46,21 @@ class SegmentationDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        img_path = self.data.iloc[idx, 1]  # 이미지 파일 경로는 0번째 열에 저장되어 있다고 가정합니다.
-        mask_path = self.data.iloc[idx, 2]  # 마스크 파일 경로는 1번째 열에 저장되어 있다고 가정합니다.
+    img_path = self.data.iloc[idx, 1]  # 이미지 파일 경로는 1번째 열에 저장되어 있다고 가정합니다.
+    mask_rle = self.data.iloc[idx, 2]  # 마스크 RLE 데이터는 2번째 열에 저장되어 있다고 가정합니다.
 
-        image = cv2.imread(img_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.imread(img_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        mask = rle_decode(mask_rle, (image.shape[0], image.shape[1]))   # 마스크 이미지를 흑백으로 로드합니다.
+    mask = rle_decode(mask_rle, (image.shape[0], image.shape[1]))  # 마스크 RLE 데이터를 디코딩하여 이미지 형태로 변환합니다.
 
-        if self.transform:
-            augmented = self.transform(image=image, mask=mask)
-            image = augmented['image']
-            mask = augmented['mask']
+    if self.transform:
+        augmented = self.transform(image=image, mask=mask)
+        image = augmented['image']
+        mask = augmented['mask']
 
-        return image, mask
+    return image, mask
+
 
 # 이미지 변환을 위한 Albumentations 변환 정의
 transform = A.Compose(
