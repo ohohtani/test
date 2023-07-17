@@ -161,7 +161,7 @@ class ASPP(nn.Module):
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
 
         self.conv_bn_relu = nn.Sequential(
-            nn.Conv2d(out_channels * 5, out_channels, kernel_size=1),
+            nn.Conv2d(out_channels * 6, out_channels, kernel_size=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
@@ -181,6 +181,7 @@ class ASPP(nn.Module):
         output = self.conv_bn_relu(output)
 
         return output
+
 
 
 
