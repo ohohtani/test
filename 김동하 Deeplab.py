@@ -74,7 +74,7 @@ transform = A.Compose(
 
 # 학습 데이터셋 및 데이터 로더 생성
 train_dataset = SegmentationDataset(csv_file='./train.csv', transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=0)
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=4)
 
 
 
@@ -211,7 +211,7 @@ for epoch in range(10):
 
 # 테스트 데이터셋 및 데이터 로더 생성
 test_dataset = SegmentationDataset(csv_file='./test.csv', transform=transform)
-test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=0)
+test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
 
 
 with torch.no_grad():
