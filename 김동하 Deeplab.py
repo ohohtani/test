@@ -46,13 +46,13 @@ class SegmentationDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        img_path = self.data.iloc[idx, 0]  # 이미지 파일 경로는 0번째 열에 저장되어 있다고 가정합니다.
-        mask_path = self.data.iloc[idx, 1]  # 마스크 파일 경로는 1번째 열에 저장되어 있다고 가정합니다.
+        img_path = self.data.iloc[idx, 1]  # 이미지 파일 경로는 0번째 열에 저장되어 있다고 가정합니다.
+        mask_path = self.data.iloc[idx, 2]  # 마스크 파일 경로는 1번째 열에 저장되어 있다고 가정합니다.
 
         image = cv2.imread(img_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        mask = cv2.imread(mask_path, 0)  # 마스크 이미지를 흑백으로 로드합니다.
+        mask = rle_decode(mask_rle, (image.shape[0], image.shape[1]))   # 마스크 이미지를 흑백으로 로드합니다.
 
         if self.transform:
             augmented = self.transform(image=image, mask=mask)
@@ -74,9 +74,6 @@ transform = A.Compose(
 train_dataset = SegmentationDataset(csv_file='./train.csv', transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=0)
 
-# 테스트 데이터셋 및 데이터 로더 생성
-test_dataset = SegmentationDataset(csv_file='./test.csv', transform=transform)
-test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=0)
 
 
 
@@ -207,6 +204,9 @@ for epoch in range(10):
 
     print(f'Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}')
 
+# 테스트 데이터셋 및 데이터 로더 생성
+test_dataset = SegmentationDataset(csv_file='./test.csv', transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=0)
 
 
 with torch.no_grad():
