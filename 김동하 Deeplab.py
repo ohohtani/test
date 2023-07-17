@@ -58,7 +58,7 @@ class SegmentationDataset(Dataset):
         augmented = self.transform(image=image, mask=mask)
         image = augmented['image']
         mask = augmented['mask']
-
+    
     return image, mask
 
 
