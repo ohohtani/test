@@ -185,6 +185,8 @@ class ASPP(nn.Module):
 
 
 model = DeepLab()
+model = model.to(device)  # 모델을 GPU로 전송합니다.
+
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.BCEWithLogitsLoss()
 
