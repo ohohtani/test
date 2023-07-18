@@ -62,8 +62,8 @@ class SatelliteDataset(Dataset):
             image = augmented['image']
             mask = augmented['mask']
 
-        # 마스크 데이터를 그대로 반환합니다.
-        return image, mask
+        # 마스크 데이터에 차원을 추가하여 반환합니다.
+        return image, mask.unsqueeze(0)
 
 
 
@@ -76,7 +76,7 @@ transform = A.Compose(
 )
 
 dataset = SatelliteDataset(csv_file='./train.csv', transform=transform)
-dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
 
 
 # U-Net의 기본 구성 요소인 Double Convolution Block을 정의합니다.
