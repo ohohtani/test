@@ -62,8 +62,8 @@ class SatelliteDataset(Dataset):
             image = augmented['image']
             mask = augmented['mask']
 
-        # 마스크 데이터에 차원을 추가하여 반환합니다.
-        return image, mask.unsqueeze(0)
+        # 마스크 데이터를 그대로 반환합니다.
+        return image, mask
 
 
 
