@@ -177,6 +177,7 @@ def calculate_class_weights(mask):
 
 # loss function과 optimizer 정의 (BCEDiceLoss 사용)
 criterion = BCEDiceLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Early Stopping 기법을 위한 변수 초기화
 best_loss = float('inf')
