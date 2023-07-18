@@ -13,13 +13,19 @@ import albumentations as A   # 이미지 처리 작업을 위한 다양한 도�
 from albumentations.pytorch import ToTensorV2  
 
 if __name__ == '__main__':
-    # freeze_support() 함수는 Windows에서 파이썬 스크립트가 exe 파일로 변환될 경우 필요합니다.
-    # 실행 파일이 아니라면 해당 부분은 무시해도 됩니다.
     try:
         from multiprocessing import freeze_support
         freeze_support()
     except ImportError:
         pass
+
+    import torch
+    import torch.nn as nn
+    # 다른 필요한 라이브러리들도 import하는 부분
+
+    # DeepLab 클래스와 관련된 코드 정의 (내부적으로 double_conv 함수 사용)
+
+    # 이후에 DataLoader를 초기화하고 모델을 학습시키는 등의 작업을 수행할 수 있습니다.
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
