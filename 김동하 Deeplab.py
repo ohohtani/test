@@ -12,6 +12,16 @@ from tqdm import tqdm    # 진행상황을 시각화 해준다
 import albumentations as A   # 이미지 처리 작업을 위한 다양한 도메인 지원
 from albumentations.pytorch import ToTensorV2  
 
+if __name__ == '__main__':
+    # freeze_support() 함수는 Windows에서 파이썬 스크립트가 exe 파일로 변환될 경우 필요합니다.
+    # 실행 파일이 아니라면 해당 부분은 무시해도 됩니다.
+    try:
+        from multiprocessing import freeze_support
+        freeze_support()
+    except ImportError:
+        pass
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def rle_decode(mask_rle, shape):    # rle_decode라는 함수를 정의한다. 인자로는 rle 방식으로 압축된 mask와 원래 형태의 이미지(shape)를 받는다.
