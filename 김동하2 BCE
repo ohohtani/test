@@ -66,9 +66,8 @@ class SatelliteDataset(Dataset):
         return image, mask.unsqueeze(0)
 
 
-
 transform = A.Compose(
-    [   
+    [
         A.Resize(224, 224),
         A.Normalize(),
         ToTensorV2()
@@ -144,6 +143,7 @@ class UNet(nn.Module):
 
         return out
 
+# BCE-Dice Loss를 위한 클래스 정의
 class BCEDiceLoss(nn.Module):
     def __init__(self, weight=None, smooth=1.0):
         super(BCEDiceLoss, self).__init__()
@@ -159,13 +159,24 @@ class BCEDiceLoss(nn.Module):
 
         return bce_loss + (1 - dice)
 
-
 # 모델 초기화
 model = UNet().to(device)
 
+# BCE-Dice Loss에 가중치 적용하기 위한 가중치 계산 함수
+def calculate_class_weights(mask):
+    class_weights = torch.zeros(2, dtype=torch.float32)
+    total_pixels = mask.numel()
+
+    positive_pixels = (mask == 1).sum().item()
+    negative_pixels = total_pixels - positive_pixels
+
+    class_weights[1] = (total_pixels - positive_pixels) / total_pixels
+    class_weights[0] = positive_pixels / total_pixels
+
+    return class_weights.to(device)
+
 # loss function과 optimizer 정의 (BCEDiceLoss 사용)
-criterion = BCEDiceLoss(weight=calculate_class_weights(dataset[0][1].unsqueeze(0)))
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+criterion = BCEDiceLoss()
 
 # Early Stopping 기법을 위한 변수 초기화
 best_loss = float('inf')
@@ -182,7 +193,7 @@ if __name__ == '__main__':
             masks = masks.float().to(device)
             optimizer.zero_grad()
             outputs = model(images)
-            loss = criterion(outputs, masks)  # BCEDiceLoss 사용
+            loss = criterion(outputs, masks)  # BCE-Dice Loss 사용
             loss.backward()
             optimizer.step()
 
@@ -200,7 +211,6 @@ if __name__ == '__main__':
                 break
 
         print(f'Epoch {epoch + 1}, Loss: {epoch_loss / len(dataloader)}')
-
 
     # 테스트 데이터 예측 및 결과 저장
     test_dataset = SatelliteDataset(csv_file='./test.csv', transform=transform, infer=True)
