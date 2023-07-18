@@ -1,9 +1,16 @@
+import os    # 파일 디렉토리 관련
+import cv2  
+import pandas as pd
+import numpy as np
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import models, transforms
-from torch.utils.data import Dataset, DataLoader
-import albumentations as A
+from torch.utils.data import Dataset, DataLoader    # 사용자 정의 데이터셋 클래스를 생성할 때 사용 -> 이미지, 텍스트 등 다양한 유형의 데이터셋 처리 가능
+from torchvision import transforms   # 이미지 전처리를 편리하게 수행 가능
+
+from tqdm import tqdm    # 진행상황을 시각화 해준다
+import albumentations as A   # 이미지 처리 작업을 위한 다양한 도메인 지원
+from albumentations.pytorch import ToTensorV2  
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
