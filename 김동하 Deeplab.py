@@ -42,7 +42,7 @@ class SatelliteDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
-
+    
     def __getitem__(self, idx):
         img_path = self.data.iloc[idx, 1]
         image = cv2.imread(img_path)
@@ -107,6 +107,7 @@ class ASPP(nn.Module):
         return output
 
 # DeepLab 모델 정의
+
 class DeepLab(nn.Module):
     def __init__(self, num_classes):
         super(DeepLab, self).__init__()
@@ -114,15 +115,15 @@ class DeepLab(nn.Module):
         # 인코더 부분과 디코더 부분에 사용할 ASPP 블록 정의
         self.aspp = ASPP(in_channels=512, out_channels=256)
         # 인코더 부분의 층을 정의 (먼저 기반 코드에서 이미 정의되어 있음)
-        self.dconv_down1 = double_conv(3, 64)
-        self.dconv_down2 = double_conv(64, 128)
-        self.dconv_down3 = double_conv(128, 256)
-        self.dconv_down4 = double_conv(256, 512)
+        self.dconv_down1 = self.double_conv(3, 64)
+        self.dconv_down2 = self.double_conv(64, 128)
+        self.dconv_down3 = self.double_conv(128, 256)
+        self.dconv_down4 = self.double_conv(256, 512)
         # 디코더 부분의 층을 정의 (먼저 기반 코드에서 이미 정의되어 있음)
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.dconv_up3 = double_conv(256 + 512, 256)
-        self.dconv_up2 = double_conv(128 + 256, 128)
-        self.dconv_up1 = double_conv(128 + 64, 64)
+        self.dconv_up3 = self.double_conv(256 + 512, 256)
+        self.dconv_up2 = self.double_conv(128 + 256, 128)
+        self.dconv_up1 = self.double_conv(128 + 64, 64)
         # 최종 출력에 사용할 convolution 층 정의
         self.conv_last = nn.Conv2d(64, num_classes, 1)
 
@@ -150,6 +151,15 @@ class DeepLab(nn.Module):
         # 최종 출력 층 적용
         out = self.conv_last(x)
         return out
+
+    def double_conv(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+
 
 # Initialize the model and move it to the GPU if available
 model = DeepLab(num_classes=1).to(device)
