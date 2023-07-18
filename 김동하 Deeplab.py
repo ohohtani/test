@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torchvision import models, transforms
 from torch.utils.data import Dataset, DataLoader
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 def rle_decode(mask_rle, shape):    # rle_decode라는 함수를 정의한다. 인자로는 rle 방식으로 압축된 mask와 원래 형태의 이미지(shape)를 받는다.
     s = mask_rle.split()            # maks_rle(rle 방식으로 압축된 마스크)를 공백을 기준으로 분할하여 s 리스트에 저장한다. (split이 그런 역할임 ㅇㅇ)
     starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]   # s 리스트에서 짝수 인덱스와 홀수 인덱스를 분리하여 각각 starts에 위치 lengths에 길이로 저장한다.
@@ -52,40 +54,7 @@ class SatelliteDataset(Dataset):
             mask = augmented['mask']
 
         return image, mask
-
-# Define the DeepLab model
-class DeepLab(nn.Module):
-    def __init__(self, num_classes):
-        super(DeepLab, self).__init__()
-        self.num_classes = num_classes
-
-        # Load the pre-trained ResNet-101 model
-        resnet = models.resnet101(pretrained=True)
-
-        # Extract the layers from the ResNet model
-        self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool)
-        self.layer1 = resnet.layer1
-        self.layer2 = resnet.layer2
-        self.layer3 = resnet.layer3
-        self.layer4 = resnet.layer4
-
-        # Atrous convolutional layer with dilation rate 2
-        self.atrous_convolution = nn.Conv2d(2048, 1024, kernel_size=3, stride=1, padding=2, dilation=2)
-
-    def forward(self, x):
-        x = self.layer0(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.atrous_convolution(x)
-
-        # Upsample the output to match the input size
-        x = F.interpolate(x, size=(x.size(2) * 8, x.size(3) * 8), mode='bilinear', align_corners=True)
-
-        return x
-
+        
 # Define the data transformations
 transform = A.Compose(
     [
@@ -99,8 +68,82 @@ transform = A.Compose(
 dataset = SatelliteDataset(csv_file='./train.csv', transform=transform)
 dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
 
+# DeepLab의 ASPP 블록 정의
+class ASPP(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ASPP, self).__init__()
+        # ASPP에 사용할 다양한 dilated convolution 크기들을 정의
+        dilations = [1, 6, 12, 18]
+        # dilated convolution을 4개 적용 (합산)하여 채널 수를 줄여줌
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 1)
+        self.conv2 = nn.Conv2d(in_channels, out_channels, 3, padding=dilations[0], dilation=dilations[0])
+        self.conv3 = nn.Conv2d(in_channels, out_channels, 3, padding=dilations[1], dilation=dilations[1])
+        self.conv4 = nn.Conv2d(in_channels, out_channels, 3, padding=dilations[2], dilation=dilations[2])
+        self.conv5 = nn.Conv2d(in_channels, out_channels, 3, padding=dilations[3], dilation=dilations[3])
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv1x1_output = nn.Conv2d(out_channels * 5, out_channels, 1)
+
+    def forward(self, x):
+        # 각각의 dilated convolution을 적용하고 합침
+        conv1 = self.conv1(x)
+        conv2 = self.conv2(x)
+        conv3 = self.conv3(x)
+        conv4 = self.conv4(x)
+        conv5 = self.conv5(x)
+        global_avg_pool = self.global_avg_pool(x)
+        global_avg_pool = self.conv1(global_avg_pool)
+        # 모든 결과를 합침
+        output = torch.cat([conv1, conv2, conv3, conv4, conv5, global_avg_pool], dim=1)
+        # 1x1 convolution을 통해 최종 결과를 반환
+        output = self.conv1x1_output(output)
+        return output
+
+# DeepLab 모델 정의
+class DeepLab(nn.Module):
+    def __init__(self, num_classes):
+        super(DeepLab, self).__init__()
+        self.num_classes = num_classes
+        # 인코더 부분과 디코더 부분에 사용할 ASPP 블록 정의
+        self.aspp = ASPP(in_channels=512, out_channels=256)
+        # 인코더 부분의 층을 정의 (먼저 기반 코드에서 이미 정의되어 있음)
+        self.dconv_down1 = double_conv(3, 64)
+        self.dconv_down2 = double_conv(64, 128)
+        self.dconv_down3 = double_conv(128, 256)
+        self.dconv_down4 = double_conv(256, 512)
+        # 디코더 부분의 층을 정의 (먼저 기반 코드에서 이미 정의되어 있음)
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.dconv_up3 = double_conv(256 + 512, 256)
+        self.dconv_up2 = double_conv(128 + 256, 128)
+        self.dconv_up1 = double_conv(128 + 64, 64)
+        # 최종 출력에 사용할 convolution 층 정의
+        self.conv_last = nn.Conv2d(64, num_classes, 1)
+
+    def forward(self, x):
+        # 인코더 부분의 순전파 수행 (기반 코드와 동일)
+        conv1 = self.dconv_down1(x)
+        x = nn.MaxPool2d(2)(conv1)
+        conv2 = self.dconv_down2(x)
+        x = nn.MaxPool2d(2)(conv2)
+        conv3 = self.dconv_down3(x)
+        x = nn.MaxPool2d(2)(conv3)
+        x = self.dconv_down4(x)
+        # ASPP 블록을 사용하여 다양한 컨텍스트 정보 캡처
+        x = self.aspp(x)
+        # 디코더 부분의 순전파 수행 (기반 코드와 동일)
+        x = self.upsample(x)
+        x = torch.cat([x, conv3], dim=1)
+        x = self.dconv_up3(x)
+        x = self.upsample(x)
+        x = torch.cat([x, conv2], dim=1)
+        x = self.dconv_up2(x)
+        x = self.upsample(x)
+        x = torch.cat([x, conv1], dim=1)
+        x = self.dconv_up1(x)
+        # 최종 출력 층 적용
+        out = self.conv_last(x)
+        return out
+
 # Initialize the model and move it to the GPU if available
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = DeepLab(num_classes=1).to(device)
 
 # Define the loss function and optimizer
@@ -108,11 +151,11 @@ criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Train the model for 10 epochs
-# Train the model for 10 epochs
+
 for epoch in range(10):
     model.train()
     epoch_loss = 0
-    for images, masks in dataloader:
+    for images, masks in tqdm(dataloader):
         images = images.float().to(device)
         masks = masks.float().to(device)
 
@@ -134,7 +177,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_wor
 with torch.no_grad():
     model.eval()
     result = []
-    for images in test_dataloader:
+    for images in tqdm(test_dataloader):
         images = images.float().to(device)
 
         outputs = model(images)
