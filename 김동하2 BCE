@@ -144,33 +144,27 @@ class UNet(nn.Module):
 
         return out
 
-# 클래스 가중치 계산 함수
-def calculate_class_weights(mask):
-    # 클래스 빈도 계산
-    class_frequencies = [torch.sum(mask == c) for c in range(2)]
-    # 역 클래스 빈도 계산
-    class_weights = [1 / freq for freq in class_frequencies]
-    return torch.FloatTensor(class_weights).to(device)
+class BCEDiceLoss(nn.Module):
+    def __init__(self, weight=None, smooth=1.0):
+        super(BCEDiceLoss, self).__init__()
+        self.bce_loss = nn.BCEWithLogitsLoss(weight=weight)
+        self.smooth = smooth
 
-# Dice Loss 함수 정의
-class DiceLoss(nn.Module):
-    def __init__(self):
-        super(DiceLoss, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1.0):
+    def forward(self, inputs, targets):
         inputs = torch.sigmoid(inputs)
+        bce_loss = self.bce_loss(inputs, targets)
+
         intersection = (inputs * targets).sum()
-        dice = (2.0 * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
-        return 1 - dice
+        dice = (2.0 * intersection + self.smooth) / (inputs.sum() + targets.sum() + self.smooth)
+
+        return bce_loss + (1 - dice)
 
 
 # 모델 초기화
 model = UNet().to(device)
 
-# loss function과 optimizer 정의
-# 클래스 가중치 계산을 위해 dataset[0][1] 대신 dataset[0][1].unsqueeze(0)을 사용합니다.
-criterion_bce = nn.BCEWithLogitsLoss(weight=calculate_class_weights(dataset[0][1].unsqueeze(0)))
-criterion_dice = DiceLoss()
+# loss function과 optimizer 정의 (BCEDiceLoss 사용)
+criterion = BCEDiceLoss(weight=calculate_class_weights(dataset[0][1].unsqueeze(0)))
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Early Stopping 기법을 위한 변수 초기화
@@ -188,9 +182,7 @@ if __name__ == '__main__':
             masks = masks.float().to(device)
             optimizer.zero_grad()
             outputs = model(images)
-            loss_bce = criterion_bce(outputs, masks.unsqueeze(1))
-            loss_dice = criterion_dice(outputs, masks.unsqueeze(1))
-            loss = loss_bce + loss_dice  # BCE Loss와 Dice Loss의 합을 최소화
+            loss = criterion(outputs, masks)  # BCEDiceLoss 사용
             loss.backward()
             optimizer.step()
 
