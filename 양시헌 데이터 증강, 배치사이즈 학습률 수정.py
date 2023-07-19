@@ -181,4 +181,31 @@ if __name__ == '__main__':
 
         print(f'Epoch {epoch+1}, Loss: {epoch_loss/len(dataloader)}')
 
-    # 이하 생략
+    test_dataset = SatelliteDataset(csv_file='./test.csv', transform=transform, infer=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
+
+
+    with torch.no_grad():
+        model.eval()
+        result = []
+        for images in tqdm(test_dataloader):
+            images = images.float().to(device)
+            
+
+            outputs = model(images)
+            masks = torch.sigmoid(outputs).cpu().numpy()
+            masks = np.squeeze(masks, axis=1)
+            masks = (masks > 0.35).astype(np.uint8) # Threshold = 0.35
+            
+            for i in range(len(images)):
+                mask_rle = rle_encode(masks[i])
+                if mask_rle == '': # 예측된 건물 픽셀이 아예 없는 경우 -1
+                    result.append(-1)
+                else:
+                    result.append(mask_rle)
+
+
+    submit = pd.read_csv('./sample_submission.csv')
+    submit['mask_rle'] = result
+
+    submit.to_csv('./submit.csv', index=False)
