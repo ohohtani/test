@@ -1,3 +1,8 @@
+# transform 부분의 데이터 증강 수정
+# 학습률, 배치사이즈, 학습 횟수 변수를 따로두고 숫자 변경
+# 일단 1차 시도는 데이터 증강 수정 + 배치 사이즈 16 -> 32임 아마 컴파일 시간이 더 오래 걸릴텐데 생각보다 오래 안걸린다 싶으면
+# 학습률도 0.0001로 수정하고 배치도 64까지 수정해볼 예정
+
 import os
 import cv2
 import pandas as pd
@@ -48,7 +53,7 @@ class SatelliteDataset(Dataset):
         img_path = self.data.iloc[idx, 1]
         image = cv2.imread(img_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
+        
         if self.infer:
             if self.transform:
                 image = self.transform(image=image)['image']
@@ -56,7 +61,7 @@ class SatelliteDataset(Dataset):
 
         mask_rle = self.data.iloc[idx, 2]
         mask = rle_decode(mask_rle, (image.shape[0], image.shape[1]))
-
+  
         if self.transform:
             augmented = self.transform(image=image, mask=mask)
             image = augmented['image']
@@ -66,8 +71,11 @@ class SatelliteDataset(Dataset):
 
 
 transform = A.Compose(
-    [
+    [   
         A.Resize(224, 224),
+        A.HorizontalFlip(p=0.5),  # 수평 뒤집기 추가
+        A.VerticalFlip(p=0.5),  # 수직 뒤집기 추가
+        A.Rotate(limit=30, p=0.5),  # 회전 추가
         A.Normalize(),
         ToTensorV2()
     ]
@@ -85,7 +93,6 @@ def double_conv(in_channels, out_channels):
         nn.Conv2d(out_channels, out_channels, 3, padding=1),
         nn.ReLU(inplace=True)
     )
-
 
 # 간단한 U-Net 모델 정의
 class UNet(nn.Module):
@@ -147,26 +154,18 @@ class UNet(nn.Module):
 # model 초기화
 model = UNet().to(device)
 
+# 하이퍼파라미터 조정
+learning_rate = 0.001
+batch_size = 32
+num_epochs = 10
+
 # loss function과 optimizer 정의
-class DiceLoss(nn.Module):
-    def __init__(self):
-        super(DiceLoss, self).__init__()
-
-    def forward(self, input, target):
-        smooth = 1e-7
-        input_flat = input.view(-1)
-        target_flat = target.view(-1)
-        intersection = (input_flat * target_flat).sum()
-
-        return 1 - (2.0 * intersection + smooth) / (input_flat.sum() + target_flat.sum() + smooth)
-
-
-criterion = DiceLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+criterion = torch.nn.BCEWithLogitsLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 if __name__ == '__main__':
     # training loop
-    for epoch in range(10):  # 10 에폭 동안 학습합니다.
+    for epoch in range(num_epochs):  # num_epochs 에폭 동안 학습합니다.
         model.train()
         epoch_loss = 0
         for images, masks in tqdm(dataloader):
@@ -180,30 +179,6 @@ if __name__ == '__main__':
 
             epoch_loss += loss.item()
 
-        print(f'Epoch {epoch + 1}, Loss: {epoch_loss / len(dataloader)}')
+        print(f'Epoch {epoch+1}, Loss: {epoch_loss/len(dataloader)}')
 
-    test_dataset = SatelliteDataset(csv_file='./test.csv', transform=transform, infer=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4)
-
-    with torch.no_grad():
-        model.eval()
-        result = []
-        for images in tqdm(test_dataloader):
-            images = images.float().to(device)
-
-            outputs = model(images)
-            masks = torch.sigmoid(outputs).cpu().numpy()
-            masks = np.squeeze(masks, axis=1)
-            masks = (masks > 0.35).astype(np.uint8)  # Threshold = 0.35
-
-            for i in range(len(images)):
-                mask_rle = rle_encode(masks[i])
-                if mask_rle == '':  # 예측된 건물 픽셀이 아예 없는 경우 -1
-                    result.append(-1)
-                else:
-                    result.append(mask_rle)
-
-    submit = pd.read_csv('./sample_submission.csv')
-    submit['mask_rle'] = result
-
-    submit.to_csv('./submit.csv', index=False)
+    # 이하 생략
